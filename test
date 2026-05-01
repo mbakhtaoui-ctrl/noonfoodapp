@@ -1,1 +1,20 @@
+// Dummy code for testing
+function helloWorld() {
+  console.log("Hello, World!");
+}
 
+const greeting = "Welcome to Noon Food App";
+const version = "1.0.0";
+
+class DummyClass {
+  constructor(name) {
+    this.name = name;
+  }
+  
+  greet() {
+    return `Hello, ${this.name}!`;
+  }
+}
+
+// Export for testing
+module.exports = { helloWorld, greeting, version, DummyClass };
