@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sephora Advertiser View — Performance Dashboard</title>
+<meta name="description" content="Real-time retail media performance dashboard for Sephora advertisers: ROAS, CTR and spend in EUR, refreshed every 15 seconds, with PDF export." />
+<style>
+/* ============================================================
+   PLAT-33548 — Performance Dashboard, Sephora Advertiser View
+   Self-contained: no external fonts, scripts or network calls.
+   ============================================================ */
+:root{
+  --bg:#f5f5f7;
+  --surface:#ffffff;
+  --ink:#0a0a0a;
+  --ink-soft:#5f6168;
+  --ink-faint:#8e9096;
+  --line:#e3e3e8;
+  --brand:#000000;
+  --accent:#d81b60;      /* Sephora-adjacent magenta accent */
+  --accent-soft:#fde7ef;
+  --pos:#0f8a4f;
+  --pos-soft:#e6f5ed;
+  --neg:#c62828;
+  --neg-soft:#fdeaea;
+  --live:#12b76a;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Helvetica Neue",Helvetica,Arial,"Segoe UI",Roboto,sans-serif;
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 24px 56px}
+
+/* ---------- Header ---------- */
+.topbar{
+  background:var(--brand);color:#fff;
+  border-radius:var(--radius);
+  padding:20px 24px;
+  display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;
+  box-shadow:var(--shadow);
+}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.brand .mark{
+  font-weight:800;letter-spacing:.34em;font-size:16px;text-transform:uppercase;
+  border:2px solid #fff;padding:7px 12px 7px 14px;border-radius:4px;white-space:nowrap;
+}
+.brand .titles h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.02em}
+.brand .titles p{margin:2px 0 0;font-size:12px;color:#c9c9cf}
+.topbar-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+.pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  color:#fff;border-radius:999px;padding:7px 13px;font-size:12px;font-weight:500;white-space:nowrap;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 0 0 rgba(18,183,106,.7);animation:pulse 2s infinite}
+.dot.paused{background:#f0a202;animation:none}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(18,183,106,.65)}
+  70%{box-shadow:0 0 0 7px rgba(18,183,106,0)}
+  100%{box-shadow:0 0 0 0 rgba(18,183,106,0)}
+}
+.btn{
+  appearance:none;border:1px solid rgba(255,255,255,.28);background:transparent;color:#fff;
+  font:inherit;font-size:12px;font-weight:600;padding:9px 15px;border-radius:999px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.btn:hover{background:rgba(255,255,255,.14)}
+.btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.btn.primary{background:#fff;color:#000;border-color:#fff}
+.btn.primary:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Filter bar ---------- */
+.filters{
+  margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 18px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;box-shadow:var(--shadow);
+}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);font-weight:700}
+.field select{
+  font:inherit;font-size:13px;padding:8px 32px 8px 11px;border:1px solid var(--line);border-radius:8px;
+  background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%235f6168' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right 10px center;
+  color:var(--ink);cursor:pointer;appearance:none;min-width:168px;
+}
+.field select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.filters .spacer{flex:1 1 auto}
+.meta-note{font-size:11.5px;color:var(--ink-faint);text-align:right;line-height:1.5}
+.meta-note b{color:var(--ink);font-weight:600}
+
+/* ---------- KPI cards ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.kpi.hero{border-color:#111;box-shadow:0 1px 2px rgba(16,24,40,.06),0 10px 30px rgba(216,27,96,.12)}
+.kpi .kpi-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.kpi .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-soft);font-weight:700}
+.kpi .tag{font-size:9.5px;letter-spacing:.08em;font-weight:700;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:3px 7px;border-radius:5px}
+.kpi .kpi-value{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:10px 0 2px;font-variant-numeric:tabular-nums;transition:color .35s ease}
+.kpi .kpi-value.flash{color:var(--accent)}
+.kpi .kpi-sub{font-size:12px;color:var(--ink-faint)}
+.delta{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;margin-top:10px;font-variant-numeric:tabular-nums}
+.delta.up{color:var(--pos);background:var(--pos-soft)}
+.delta.down{color:var(--neg);background:var(--neg-soft)}
+.delta .arrow{font-size:10px;line-height:1}
+.spark{display:block;width:100%;height:38px;margin-top:12px}
+
+/* ---------- Layout grids ---------- */
+.grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-top:16px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:4px}
+.panel-head h2{margin:0;font-size:14px;font-weight:700;letter-spacing:.01em}
+.panel-head .hint{font-size:11.5px;color:var(--ink-faint)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft)}
+.swatch{width:11px;height:3px;border-radius:2px;display:inline-block}
+
+/* ---------- Table ---------- */
+table{width:100%;border-collapse:collapse;margin-top:10px;font-variant-numeric:tabular-nums}
+th,td{padding:10px 8px;text-align:right;border-bottom:1px solid var(--line);font-size:12.5px;white-space:nowrap}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);font-weight:700;border-bottom:1.5px solid var(--line)}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafafc}
+.cname{font-weight:600}
+.cmeta{font-size:11px;color:var(--ink-faint);font-weight:400}
+.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:5px}
+.chip.live{color:var(--pos);background:var(--pos-soft)}
+.chip.learn{color:#8a6100;background:#fdf3e2}
+.chip.cap{color:var(--neg);background:var(--neg-soft)}
+.bar{height:6px;border-radius:3px;background:#ececf1;overflow:hidden;min-width:70px}
+.bar > i{display:block;height:100%;border-radius:3px;background:var(--brand)}
+tfoot td{font-weight:700;border-top:1.5px solid var(--line);font-size:12.5px;padding-top:11px}
+
+/* ---------- Side lists ---------- */
+.stat-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.stat-row:last-child{border-bottom:none}
+.stat-row .k{font-size:12.5px;color:var(--ink-soft)}
+.stat-row .v{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.alert{display:flex;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.alert:last-child{border-bottom:none}
+.alert .icon{flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:800}
+.alert.good .icon{background:var(--pos-soft);color:var(--pos)}
+.alert.warn .icon{background:#fdf3e2;color:#8a6100}
+.alert.info .icon{background:var(--accent-soft);color:var(--accent)}
+.alert p{margin:0;font-size:12.5px;line-height:1.45}
+.alert time{display:block;font-size:11px;color:var(--ink-faint);margin-top:2px}
+
+footer.page-foot{margin-top:22px;font-size:11.5px;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1080px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-2{grid-template-columns:1fr}
+}
+@media (max-width:620px){
+  .wrap{padding:14px 14px 40px}
+  .kpis{grid-template-columns:1fr}
+  .topbar{padding:16px}
+}
+
+/* ---------- Print / PDF export ---------- */
+@media print{
+  @page{size:A4 landscape;margin:11mm}
+  :root{--shadow:none}
+  body{background:#fff;font-size:10.5px}
+  .wrap{max-width:none;padding:0}
+  .no-print{display:none !important}
+  .topbar{border-radius:0;border-bottom:2px solid #000;background:#fff;color:#000;padding:0 0 10px}
+  .brand .mark{border-color:#000}
+  .brand .titles p,.pill{color:#000}
+  .pill{background:#fff;border-color:#bbb}
+  .card,.filters{box-shadow:none;border-color:#c9c9cf;break-inside:avoid;page-break-inside:avoid}
+  .kpis{gap:8px}
+  .kpi .kpi-value{font-size:25px}
+  .grid-2{gap:8px;margin-top:8px}
+  .print-only{display:block !important}
+  tbody tr:hover{background:transparent}
+  a{text-decoration:none;color:#000}
+}
+.print-only{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ========================= HEADER ========================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">Sephora</div>
+      <div class="titles">
+        <h1>Performance Dashboard — Advertiser View</h1>
+        <p>Sephora Retail Media Network · EU Marketplace · All values in EUR (€)</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="pill" title="Data streams from the Retail Media event pipeline">
+        <span class="dot" id="liveDot"></span>
+        <span id="liveLabel">Live · next refresh in <b id="countdown">15</b>s</span>
+      </span>
+      <button class="btn no-print" id="pauseBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.4" height="14" rx="1"></rect><rect x="13.6" y="5" width="3.4" height="14" rx="1"></rect></svg>
+        <span id="pauseLabel">Pause</span>
+      </button>
+      <button class="btn no-print" id="refreshBtn" type="button">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"></path><path d="M20 4v4.5h-4.5"></path></svg>
+        Refresh now
+      </button>
+      <button class="btn primary no-print" id="pdfBtn" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 3v11"></path><path d="M8 10.5l4 4 4-4"></path><path d="M4 17.5V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5"></path></svg>
+        Export PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================= FILTERS ========================= -->
+  <section class="filters" aria-label="Dashboard filters">
+    <div class="field">
+      <label for="brandSel">Advertiser / Brand</label>
+      <select id="brandSel">
+        <option value="all">All brands (portfolio)</option>
+        <option value="fragrance">Fragrance</option>
+        <option value="makeup">Make-up</option>
+        <option value="skincare">Skincare</option>
+        <option value="haircare">Haircare</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="rangeSel">Reporting period</label>
+      <select id="rangeSel">
+        <option value="today" selected>Today (live)</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="qtd">Quarter to date</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="marketSel">Market</label>
+      <select id="marketSel">
+        <option value="eu">Europe — all (EUR)</option>
+        <option value="fr">France</option>
+        <option value="it">Italy</option>
+        <option value="es">Spain</option>
+        <option value="de">Germany</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="cadenceSel">Refresh cadence</label>
+      <select id="cadenceSel">
+        <option value="10">Every 10 seconds</option>
+        <option value="15" selected>Every 15 seconds</option>
+        <option value="25">Every 25 seconds</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <div class="meta-note">
+      Last updated <b id="lastUpdated">—</b><br>
+      Currency <b>EUR (€)</b> · Attribution <b>14-day click / 1-day view</b>
+    </div>
+  </section>
+
+  <!-- ========================= KPI CARDS ========================= -->
+  <section class="kpis" aria-label="Key performance indicators">
+    <article class="card kpi hero">
+      <div class="kpi-head">
+        <span class="kpi-label">ROAS</span>
+        <span class="tag">Real-time</span>
+      </div>
+      <div class="kpi-value" id="roasValue">—</div>
+      <div class="kpi-sub" id="roasSub">Revenue per €1 of ad spend</div>
+      <div class="delta up" id="roasDelta"><span class="arrow">▲</span><span>—</span></div>
+      <svg class="spark" id="roasSpark" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+
+    <article class="card kpi">
+      <div class="kpi-head">
+        <span class="kpi-label">CTR</span>
+        <span class="tag">Real-time</span>
+      </div>
+      <div class="kpi-value" id="ctrValue">—</div>
+      <div class="kpi-sub" id="ctrSub">Clicks ÷ impressions</div>
+      <div class="delta up" id="ctrDelta"><span class="arrow">▲</span><span>—</span></div>
+      <svg class="spark" id="ctrSpark" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+
+    <article class="card kpi">
+      <div class="kpi-head">
+        <span class="kpi-label">Spend</span>
+        <span class="tag">Real-time</span>
+      </div>
+      <div class="kpi-value" id="spendValue">—</div>
+      <div class="kpi-sub" id="spendSub">Today · pacing vs daily budget</div>
+      <div class="delta up" id="spendDelta"><span class="arrow">▲</span><span>—</span></div>
+      <svg class="spark" id="spendSpark" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+
+    <article class="card kpi">
+      <div class="kpi-head">
+        <span class="kpi-label">Attributed revenue</span>
+        <span class="tag">Real-time</span>
+      </div>
+      <div class="kpi-value" id="revValue">—</div>
+      <div class="kpi-sub" id="revSub">Sales attributed to media</div>
+      <div class="delta up" id="revDelta"><span class="arrow">▲</span><span>—</span></div>
+      <svg class="spark" id="revSpark" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+  </section>
+
+  <!-- ========================= CHART + SIDE STATS ========================= -->
+  <section class="grid-2">
+    <article class="card">
+      <div class="panel-head">
+        <h2>Spend &amp; attributed revenue — today by hour</h2>
+        <span class="hint">EUR · rolling 24h</span>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#0a0a0a"></i> Spend (€)</span>
+        <span><i class="swatch" style="background:#d81b60"></i> Attributed revenue (€)</span>
+        <span><i class="swatch" style="background:#9aa0a6"></i> ROAS trend</span>
+      </div>
+      <svg id="mainChart" viewBox="0 0 900 300" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" role="img" aria-label="Hourly spend and attributed revenue"></svg>
+    </article>
+
+    <article class="card">
+      <div class="panel-head">
+        <h2>Efficiency snapshot</h2>
+        <span class="hint">Live</span>
+      </div>
+      <div id="statList"></div>
+    </article>
+  </section>
+
+  <!-- ========================= TABLE + ALERTS ========================= -->
+  <section class="grid-2">
+    <article class="card">
+      <div class="panel-head">
+        <h2>Campaign performance</h2>
+        <span class="hint">Sorted by attributed revenue</span>
+      </div>
+      <table id="campaignTable">
+        <thead>
+          <tr>
+            <th scope="col">Campaign</th>
+            <th scope="col">Status</th>
+            <th scope="col">Impressions</th>
+            <th scope="col">Clicks</th>
+            <th scope="col">CTR</th>
+            <th scope="col">Spend (€)</th>
+            <th scope="col">Revenue (€)</th>
+            <th scope="col">ROAS</th>
+            <th scope="col">Budget pacing</th>
+          </tr>
+        </thead>
+        <tbody id="campaignBody"></tbody>
+        <tfoot id="campaignFoot"></tfoot>
+      </table>
+    </article>
+
+    <article class="card">
+      <div class="panel-head">
+        <h2>Live signals</h2>
+        <span class="hint">Last 30 min</span>
+      </div>
+      <div id="alertList"></div>
+    </article>
+  </section>
+
+  <footer class="page-foot">
+    <span>Sephora Retail Media Network · Advertiser View · PLAT-33548</span>
+    <span>All monetary values in EUR (€) · Generated <span id="footStamp">—</span></span>
+  </footer>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     1. Formatting helpers — everything monetary is EUR (€)
+     ========================================================= */
+  var LOCALE = "de-DE"; // European number formatting: 1.234,56 €
+  var eur0 = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  var eur2 = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var int0 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+  var dec2 = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var clock = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  var stamp = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "medium" });
+
+  function money(v) { return eur0.format(v); }
+  function moneyExact(v) { return eur2.format(v); }
+  function pct2(v) { return dec2.format(v) + " %"; }
+  function roasFmt(v) { return dec2.format(v) + "×"; }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* =========================================================
+     2. Deterministic pseudo-random generator
+        (seeded so the dashboard is reproducible per filter set)
+     ========================================================= */
+  function makeRng(seed) {
+    var s = seed >>> 0 || 1;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+  function hash(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
+  /* =========================================================
+     3. Campaign catalogue (the "source" feed)
+     ========================================================= */
+  var CATALOGUE = [
+    { id: "c1", name: "Sponsored Products — Fragrance Icons",  fmt: "Sponsored Products", cat: "fragrance", budget: 4200, cpc: 0.62, ctr: 1.42, cvr: 4.6, aov: 86, status: "live"  },
+    { id: "c2", name: "Sponsored Brands — Holiday Gift Sets",  fmt: "Sponsored Brands",   cat: "fragrance", budget: 3600, cpc: 0.74, ctr: 1.18, cvr: 3.9, aov: 104, status: "live" },
+    { id: "c3", name: "Onsite Display — Clean Beauty Hub",     fmt: "Onsite Display",     cat: "skincare",  budget: 2800, cpc: 0.51, ctr: 0.74, cvr: 2.7, aov: 72, status: "live"  },
+    { id: "c4", name: "Sponsored Products — Lip & Complexion", fmt: "Sponsored Products", cat: "makeup",    budget: 3100, cpc: 0.48, ctr: 1.63, cvr: 5.1, aov: 48, status: "live"  },
+    { id: "c5", name: "Retargeting — Skincare Routine Builder", fmt: "Audience Retargeting", cat: "skincare", budget: 1900, cpc: 0.44, ctr: 2.05, cvr: 6.2, aov: 64, status: "cap" },
+    { id: "c6", name: "Sponsored Brands — Haircare Launch",    fmt: "Sponsored Brands",   cat: "haircare",  budget: 1500, cpc: 0.58, ctr: 0.96, cvr: 3.1, aov: 39, status: "learn" },
+    { id: "c7", name: "Offsite Social Extension — Make-up",    fmt: "Offsite Extension",  cat: "makeup",    budget: 2300, cpc: 0.39, ctr: 1.27, cvr: 2.9, aov: 52, status: "live"  }
+  ];
+
+  var MARKET_WEIGHT = { eu: 1, fr: 0.38, it: 0.19, es: 0.17, de: 0.26 };
+  var RANGE_MULT   = { today: 1, "7d": 6.6, "30d": 27.4, qtd: 71.2 };
+  var RANGE_LABEL  = { today: "Today", "7d": "Last 7 days", "30d": "Last 30 days", qtd: "Quarter to date" };
+
+  /* =========================================================
+     4. State
+     ========================================================= */
+  var state = {
+    brand: "all",
+    range: "today",
+    market: "eu",
+    cadence: 15,      // seconds — always < 30s per acceptance criteria
+    paused: false,
+    tick: 0,
+    history: { roas: [], ctr: [], spend: [], rev: [] },
+    prev: null
+  };
+  var MAX_CADENCE = 29; // hard ceiling: refresh must be under 30 seconds
+
+  /* =========================================================
+     5. Data generation — simulates the real-time event feed
+     ========================================================= */
+  function buildSnapshot() {
+    var rangeMult = RANGE_MULT[state.range];
+    var marketW = MARKET_WEIGHT[state.market];
+    // Keep a small floor so the "today" view still shows meaningful data just after midnight.
+    var dayProgress = state.range === "today" ? Math.max(0.06, hoursElapsed() / 24) : 1;
+    var rows = [];
+
+    CATALOGUE.forEach(function (c, idx) {
+      if (state.brand !== "all" && c.cat !== state.brand) return;
+
+      var rng = makeRng(hash(c.id + state.market + state.range) + state.tick * 7919 + idx);
+      var jitter = function (base, spread) { return base * (1 + (rng() - 0.5) * spread); };
+
+      var spend = c.budget * marketW * rangeMult * dayProgress * (0.82 + rng() * 0.3);
+      var cpc = jitter(c.cpc, 0.12);
+      var clicks = spend / cpc;
+      var ctr = jitter(c.ctr, 0.14);
+      var impressions = clicks / (ctr / 100);
+      var orders = clicks * (jitter(c.cvr, 0.16) / 100);
+      var revenue = orders * jitter(c.aov, 0.1);
+
+      rows.push({
+        id: c.id, name: c.name, fmt: c.fmt, status: c.status,
+        impressions: impressions, clicks: clicks, ctr: ctr,
+        spend: spend, revenue: revenue, orders: orders, cpc: cpc,
+        roas: revenue / spend,
+        budget: c.budget * marketW * rangeMult,
+        pacing: Math.min(1.35, spend / (c.budget * marketW * rangeMult * (state.range === "today" ? Math.max(dayProgress, 0.05) : 1)))
+      });
+    });
+
+    var totals = rows.reduce(function (t, r) {
+      t.impressions += r.impressions; t.clicks += r.clicks; t.spend += r.spend;
+      t.revenue += r.revenue; t.orders += r.orders; t.budget += r.budget;
+      return t;
+    }, { impressions: 0, clicks: 0, spend: 0, revenue: 0, orders: 0, budget: 0 });
+
+    totals.ctr = totals.impressions ? (totals.clicks / totals.impressions) * 100 : 0;
+    totals.roas = totals.spend ? totals.revenue / totals.spend : 0;
+    totals.cpc = totals.clicks ? totals.spend / totals.clicks : 0;
+    totals.cpm = totals.impressions ? (totals.spend / totals.impressions) * 1000 : 0;
+    totals.cpa = totals.orders ? totals.spend / totals.orders : 0;
+    totals.aov = totals.orders ? totals.revenue / totals.orders : 0;
+    totals.acos = totals.revenue ? (totals.spend / totals.revenue) * 100 : 0;
+    totals.cvr = totals.clicks ? (totals.orders / totals.clicks) * 100 : 0;
+
+    rows.sort(function (a, b) { return b.revenue - a.revenue; });
+    return { rows: rows, totals: totals };
+  }
+
+  function hoursElapsed() {
+    var now = new Date();
+    return now.getHours() + now.getMinutes() / 60;
+  }
+
+  function buildHourly(totals) {
+    // Distribute the day's totals across hours using a shopping-curve profile.
+    var curve = [0.2,0.14,0.1,0.08,0.09,0.15,0.35,0.62,0.86,1.0,1.08,1.12,1.06,0.98,1.02,1.1,1.22,1.34,1.42,1.5,1.38,1.06,0.72,0.42];
+    var upTo = state.range === "today" ? Math.max(1, Math.ceil(hoursElapsed())) : 24;
+    var slice = curve.slice(0, upTo);
+    var sum = slice.reduce(function (a, b) { return a + b; }, 0);
+    var rng = makeRng(hash("hourly" + state.market + state.brand) + state.tick);
+    return slice.map(function (w, h) {
+      var share = w / sum;
+      var noise = 0.94 + rng() * 0.12;
+      var spend = totals.spend * share * noise;
+      var revenue = totals.revenue * share * (0.9 + rng() * 0.2);
+      return { hour: h, spend: spend, revenue: revenue, roas: spend ? revenue / spend : 0 };
+    });
+  }
+
+  /* =========================================================
+     6. Rendering — KPI cards
+     ========================================================= */
+  function pushHistory(totals) {
+    var h = state.history;
+    h.roas.push(totals.roas); h.ctr.push(totals.ctr);
+    h.spend.push(totals.spend); h.rev.push(totals.revenue);
+    Object.keys(h).forEach(function (k) { if (h[k].length > 40) h[k].shift(); });
+  }
+
+  function sparkline(svg, series, color) {
+    if (!svg) return;
+    var pts = series.slice(-30);
+    if (pts.length < 2) { svg.innerHTML = ""; return; }
+    var min = Math.min.apply(null, pts), max = Math.max.apply(null, pts);
+    var span = (max - min) || (max || 1) * 0.02;
+    var w = 300, hgt = 40, pad = 4;
+    var coords = pts.map(function (v, i) {
+      var x = (i / (pts.length - 1)) * w;
+      var y = hgt - pad - ((v - min) / span) * (hgt - pad * 2);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var area = "0," + hgt + " " + coords.join(" ") + " " + w + "," + hgt;
+    svg.innerHTML =
+      '<polygon points="' + area + '" fill="' + color + '" opacity="0.10"></polygon>' +
+      '<polyline points="' + coords.join(" ") + '" fill="none" stroke="' + color + '" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"></polyline>';
+  }
+
+  function setDelta(el, current, previous, formatter, invert) {
+    if (previous == null || !isFinite(previous) || previous === 0) {
+      el.className = "delta up";
+      el.innerHTML = '<span class="arrow">•</span><span>Baseline established</span>';
+      return;
+    }
+    var diff = current - previous;
+    var rel = (diff / previous) * 100;
+    var good = invert ? diff <= 0 : diff >= 0;
+    el.className = "delta " + (good ? "up" : "down");
+    el.innerHTML = '<span class="arrow">' + (diff >= 0 ? "▲" : "▼") + '</span><span>' +
+      (diff >= 0 ? "+" : "−") + dec2.format(Math.abs(rel)) + " % vs previous refresh · " +
+      formatter(Math.abs(diff)) + '</span>';
+  }
+
+  function flash(el) {
+    el.classList.add("flash");
+    setTimeout(function () { el.classList.remove("flash"); }, 450);
+  }
+
+  function renderKpis(snap) {
+    var t = snap.totals, p = state.prev;
+
+    $("roasValue").textContent = roasFmt(t.roas);
+    $("roasSub").textContent = "Revenue per €1 spent · " + moneyExact(t.revenue / (t.spend || 1)) + " return";
+    setDelta($("roasDelta"), t.roas, p && p.roas, function (v) { return dec2.format(v) + "×"; }, false);
+
+    $("ctrValue").textContent = pct2(t.ctr);
+    $("ctrSub").textContent = int0.format(Math.round(t.clicks)) + " clicks · " + int0.format(Math.round(t.impressions)) + " impressions";
+    setDelta($("ctrDelta"), t.ctr, p && p.ctr, function (v) { return dec2.format(v) + " pp"; }, false);
+
+    $("spendValue").textContent = money(t.spend);
+    $("spendSub").textContent = RANGE_LABEL[state.range] + " · " + dec2.format((t.spend / (t.budget || 1)) * 100) + " % of " + money(t.budget) + " budget";
+    setDelta($("spendDelta"), t.spend, p && p.spend, money, true);
+
+    $("revValue").textContent = money(t.revenue);
+    $("revSub").textContent = int0.format(Math.round(t.orders)) + " attributed orders · AOV " + money(t.aov);
+    setDelta($("revDelta"), t.revenue, p && p.revenue, money, false);
+
+    [$("roasValue"), $("ctrValue"), $("spendValue"), $("revValue")].forEach(flash);
+
+    sparkline($("roasSpark"), state.history.roas, "#d81b60");
+    sparkline($("ctrSpark"), state.history.ctr, "#0a0a0a");
+    sparkline($("spendSpark"), state.history.spend, "#0a0a0a");
+    sparkline($("revSpark"), state.history.rev, "#d81b60");
+  }
+
+  /* =========================================================
+     7. Rendering — main combo chart (pure SVG, no libraries)
+     ========================================================= */
+  function renderChart(hourly) {
+    var svg = $("mainChart");
+    var W = 900, H = 300, L = 62, R = 46, T = 16, B = 30;
+    var iw = W - L - R, ih = H - T - B;
+    var maxVal = Math.max.apply(null, hourly.map(function (d) { return Math.max(d.spend, d.revenue); })) || 1;
+    var maxRoas = Math.max.apply(null, hourly.map(function (d) { return d.roas; })) || 1;
+    var n = hourly.length;
+    var slot = iw / n;
+    var bw = Math.max(4, Math.min(16, slot * 0.32));
+    var parts = [];
+
+    // horizontal gridlines + EUR axis
+    for (var g = 0; g <= 4; g++) {
+      var val = (maxVal / 4) * g;
+      var y = T + ih - (val / maxVal) * ih;
+      parts.push('<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (L + iw) + '" y2="' + y.toFixed(1) + '" stroke="#ececf1" stroke-width="1"></line>');
+      parts.push('<text x="' + (L - 10) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#8e9096">' + money(val) + '</text>');
+    }
+    // right axis (ROAS)
+    for (var g2 = 0; g2 <= 4; g2++) {
+      var rv = (maxRoas / 4) * g2;
+      var ry = T + ih - (rv / maxRoas) * ih;
+      parts.push('<text x="' + (L + iw + 10) + '" y="' + (ry + 4).toFixed(1) + '" text-anchor="start" font-size="11" fill="#8e9096">' + dec2.format(rv) + '×</text>');
+    }
+
+    var roasPts = [];
+    hourly.forEach(function (d, i) {
+      var cx = L + slot * i + slot / 2;
+      var sh = (d.spend / maxVal) * ih;
+      var rh = (d.revenue / maxVal) * ih;
+      parts.push('<rect x="' + (cx - bw - 1).toFixed(1) + '" y="' + (T + ih - sh).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, sh).toFixed(1) + '" fill="#0a0a0a" rx="2"><title>' + pad2(d.hour) + ':00 — Spend ' + moneyExact(d.spend) + '</title></rect>');
+      parts.push('<rect x="' + (cx + 1).toFixed(1) + '" y="' + (T + ih - rh).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, rh).toFixed(1) + '" fill="#d81b60" rx="2"><title>' + pad2(d.hour) + ':00 — Revenue ' + moneyExact(d.revenue) + '</title></rect>');
+      roasPts.push(cx.toFixed(1) + "," + (T + ih - (d.roas / maxRoas) * ih).toFixed(1));
+      if (n <= 12 || i % 2 === 0) {
+        parts.push('<text x="' + cx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" font-size="10.5" fill="#8e9096">' + pad2(d.hour) + '</text>');
+      }
+    });
+
+    parts.push('<polyline points="' + roasPts.join(" ") + '" fill="none" stroke="#9aa0a6" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"></polyline>');
+    parts.push('<line x1="' + L + '" y1="' + (T + ih) + '" x2="' + (L + iw) + '" y2="' + (T + ih) + '" stroke="#c9c9cf" stroke-width="1"></line>');
+    svg.innerHTML = parts.join("");
+  }
+
+  function pad2(v) { return (v < 10 ? "0" : "") + v; }
+
+  /* =========================================================
+     8. Rendering — efficiency stats, table, signals
+     ========================================================= */
+  function renderStats(t) {
+    var rows = [
+      ["Cost per click (CPC)", moneyExact(t.cpc)],
+      ["Cost per mille (CPM)", moneyExact(t.cpm)],
+      ["Cost per acquisition (CPA)", moneyExact(t.cpa)],
+      ["Average order value (AOV)", moneyExact(t.aov)],
+      ["Conversion rate (CVR)", pct2(t.cvr)],
+      ["ACOS (spend ÷ revenue)", pct2(t.acos)],
+      ["Attributed orders", int0.format(Math.round(t.orders))],
+      ["Budget remaining", moneyExact(Math.max(0, t.budget - t.spend))]
+    ];
+    $("statList").innerHTML = rows.map(function (r) {
+      return '<div class="stat-row"><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>';
+    }).join("");
+  }
+
+  var STATUS_LABEL = { live: ["live", "Delivering"], learn: ["learn", "Learning"], cap: ["cap", "Budget capped"] };
+
+  function renderTable(snap) {
+    var body = $("campaignBody"), foot = $("campaignFoot");
+    if (!snap.rows.length) {
+      body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8e9096;padding:22px">No campaigns match the selected filters.</td></tr>';
+      foot.innerHTML = "";
+      return;
+    }
+    body.innerHTML = snap.rows.map(function (r) {
+      var st = STATUS_LABEL[r.status];
+      var pacePct = Math.round(r.pacing * 100);
+      var barColor = r.pacing > 1.05 ? "#c62828" : (r.pacing < 0.7 ? "#f0a202" : "#0a0a0a");
+      return "<tr>" +
+        '<td><div class="cname">' + r.name + '</div><div class="cmeta">' + r.fmt + '</div></td>' +
+        '<td><span class="chip ' + st[0] + '">' + st[1] + "</span></td>" +
+        "<td>" + int0.format(Math.round(r.impressions)) + "</td>" +
+        "<td>" + int0.format(Math.round(r.clicks)) + "</td>" +
+        "<td>" + pct2(r.ctr) + "</td>" +
+        "<td>" + money(r.spend) + "</td>" +
+        "<td>" + money(r.revenue) + "</td>" +
+        "<td><b>" + roasFmt(r.roas) + "</b></td>" +
+        '<td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">' +
+          '<span class="bar"><i style="width:' + Math.min(100, pacePct) + "%;background:" + barColor + '"></i></span>' +
+          "<span>" + pacePct + " %</span></div></td>" +
+        "</tr>";
+    }).join("");
+
+    var t = snap.totals;
+    foot.innerHTML = "<tr><td>Total — " + snap.rows.length + " campaigns</td><td></td>" +
+      "<td>" + int0.format(Math.round(t.impressions)) + "</td>" +
+      "<td>" + int0.format(Math.round(t.clicks)) + "</td>" +
+      "<td>" + pct2(t.ctr) + "</td>" +
+      "<td>" + money(t.spend) + "</td>" +
+      "<td>" + money(t.revenue) + "</td>" +
+      "<td>" + roasFmt(t.roas) + "</td>" +
+      "<td>" + Math.round((t.spend / (t.budget || 1)) * 100) + " %</td></tr>";
+  }
+
+  function renderAlerts(snap) {
+    var t = snap.totals;
+    var best = snap.rows.slice().sort(function (a, b) { return b.roas - a.roas; })[0];
+    var worst = snap.rows.slice().sort(function (a, b) { return a.roas - b.roas; })[0];
+    var capped = snap.rows.filter(function (r) { return r.pacing > 1.02; });
+    var now = new Date();
+    var ago = function (m) { return clock.format(new Date(now.getTime() - m * 60000)); };
+
+    var items = [];
+    if (best) items.push(["good", "▲", "<b>" + best.name + "</b> is the top performer at " + roasFmt(best.roas) + " ROAS on " + money(best.spend) + " spend.", ago(2)]);
+    if (capped.length) items.push(["warn", "!", capped.length + " campaign" + (capped.length > 1 ? "s are" : " is") + " pacing above budget — consider raising the daily cap to avoid losing impressions.", ago(6)]);
+    if (worst && worst !== best) items.push(["warn", "▼", "<b>" + worst.name + "</b> is underperforming at " + roasFmt(worst.roas) + " ROAS. Review keyword bids and creative.", ago(11)]);
+    items.push(["info", "€", "Blended CPC is " + moneyExact(t.cpc) + " and CPM " + moneyExact(t.cpm) + " across the selected market.", ago(17)]);
+    items.push(["info", "↻", "Event pipeline healthy — clicks and conversions ingested with a " + (4 + (state.tick % 3)) + "s median lag.", ago(23)]);
+
+    $("alertList").innerHTML = items.map(function (a) {
+      return '<div class="alert ' + a[0] + '"><span class="icon">' + a[1] + "</span>" +
+             "<div><p>" + a[2] + "</p><time>" + a[3] + "</time></div></div>";
+    }).join("");
+  }
+
+  /* =========================================================
+     9. Refresh cycle (always under 30 seconds)
+     ========================================================= */
+  function refresh() {
+    var snap = buildSnapshot();
+    pushHistory(snap.totals);
+    renderKpis(snap);
+    renderChart(buildHourly(snap.totals));
+    renderStats(snap.totals);
+    renderTable(snap);
+    renderAlerts(snap);
+
+    var now = new Date();
+    $("lastUpdated").textContent = clock.format(now);
+    $("footStamp").textContent = stamp.format(now);
+
+    state.prev = snap.totals;
+    state.tick += 1;
+    remaining = state.cadence;
+    paintCountdown();
+  }
+
+  var remaining = state.cadence;
+  var timer = null;
+
+  // The countdown node is re-created when the live pill is re-rendered, so always look it up.
+  function paintCountdown() {
+    var el = $("countdown");
+    if (el) el.textContent = remaining;
+  }
+
+  function startTimer() {
+    stopTimer();
+    timer = setInterval(function () {
+      if (state.paused) return;
+      remaining -= 1;
+      if (remaining <= 0) { refresh(); } else { paintCountdown(); }
+    }, 1000);
+  }
+  function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+
+  function setCadence(seconds) {
+    state.cadence = Math.min(MAX_CADENCE, Math.max(5, seconds)); // enforce sub-30s refresh
+    remaining = state.cadence;
+    paintCountdown();
+  }
+
+  /* =========================================================
+     10. Wiring
+     ========================================================= */
+  function onFilterChange() {
+    state.brand = $("brandSel").value;
+    state.range = $("rangeSel").value;
+    state.market = $("marketSel").value;
+    state.history = { roas: [], ctr: [], spend: [], rev: [] };
+    state.prev = null;
+    refresh();
+  }
+
+  ["brandSel", "rangeSel", "marketSel"].forEach(function (id) {
+    $(id).addEventListener("change", onFilterChange);
+  });
+
+  $("cadenceSel").addEventListener("change", function () {
+    setCadence(parseInt(this.value, 10));
+  });
+
+  $("refreshBtn").addEventListener("click", refresh);
+
+  $("pauseBtn").addEventListener("click", function () {
+    state.paused = !state.paused;
+    this.setAttribute("aria-pressed", String(state.paused));
+    $("pauseLabel").textContent = state.paused ? "Resume" : "Pause";
+    $("liveDot").classList.toggle("paused", state.paused);
+    $("liveLabel").innerHTML = state.paused
+      ? "Paused — data frozen"
+      : 'Live · next refresh in <b id="countdown">' + remaining + "</b>s";
+  });
+
+  // PDF export: print-to-PDF with a dedicated landscape A4 stylesheet.
+  $("pdfBtn").addEventListener("click", function () {
+    var wasPaused = state.paused;
+    state.paused = true; // freeze values while the print dialog is open
+    document.title = "Sephora_Performance_Dashboard_" +
+      new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-") + "_EUR";
+    window.print();
+    setTimeout(function () { state.paused = wasPaused; }, 800);
+  });
+
+  window.addEventListener("afterprint", function () {
+    document.title = "Sephora Advertiser View — Performance Dashboard";
+  });
+
+  // Pause polling when the tab is hidden, resume (and immediately refresh) on return.
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { stopTimer(); }
+    else if (!state.paused) { refresh(); startTimer(); }
+  });
+
+  // Boot
+  setCadence(parseInt($("cadenceSel").value, 10));
+  refresh();
+  startTimer();
+})();
+</script>
+</body>
+</html>
