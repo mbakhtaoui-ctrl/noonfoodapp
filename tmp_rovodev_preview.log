@@ -1,0 +1,7 @@
+Serving sephora-performance-dashboard.html on port 3000
+127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "GET /sephora-performance-dashboard.html HTTP/1.1" 200 -
+127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "HEAD / HTTP/1.1" 200 -
+127.0.0.1 - "GET / HTTP/1.1" 200 -
